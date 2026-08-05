@@ -212,7 +212,7 @@ fn errorBExample() !void {
     return A.PathNotFound;
 }
 
-// both comes from different error variable but they can both implement C since C implement both a and b
+// both comes from different error expression but they can both implement C since C implement both a and b
 test "merged error sets" {
     errorAExample() catch |err| {
         try std.testing.expect(err == C.RunTimePanic);
@@ -238,4 +238,43 @@ fn fasterfib(n: u32) u32 {
         sum += i;
     }
     return sum;
+}
+
+// switch statements
+// switch can be used as both statements and expression in zig
+
+// NOTE: cases doesn't fall through and doesn't require breaks; like in C
+test "switch test" {
+    var x: i8 = -1;
+    switch (x) {
+        // this one will run if it's either -1 to 1
+        -1...1 => {
+            std.debug.print("{d}\n", .{x});
+            x = -x;
+            try std.testing.expect(x == 1);
+        },
+        // this one will run if it's either 10 to 100
+        10...100 => {
+            std.debug.print("{d}\n", .{x});
+            x = @divExact(x, 10); // <- this gurantee that division will never be zero
+            try std.testing.expect(x == 1);
+        },
+        // else is like default:
+        else => {},
+    }
+}
+
+test "switch expression" {
+    var x: i8 = 10;
+    x = switch (x) {
+        // this is a way to do multiline code inside inside a switch expression
+        -1...1 => min1_to1: {
+            const val = @as(i8, -x);
+            try std.testing.expect(x == 1);
+            break :min1_to1 val;
+        },
+        10...100 => @divExact(x, 10),
+        else => x,
+    };
+    try std.testing.expect(x == x or x == 1);
 }
