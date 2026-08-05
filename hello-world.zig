@@ -278,3 +278,72 @@ test "switch expression" {
     };
     try std.testing.expect(x == x or x == 1);
 }
+
+// Runtime safety
+test "out of bounds array" {
+    // disable for current block only
+    // which mean this bullshit will somehow pass
+    @setRuntimeSafety(false);
+    const arrays = [_]u8{ 1, 2, 3 };
+    var index: u8 = 5; // <- we need to use var here since if it's index the compiler will read it at comptime and throw compiler error
+    const what_val = arrays[index];
+
+    index = index;
+    std.debug.print("{d}\n", .{what_val});
+}
+
+test "unreachable" {
+    const foo: i8 = 2;
+    // when it checks it at runtime and fail it will reach the unreachable code which will trigger runtime panic
+    const bar: i8 = if (foo == 2) 5 else unreachable;
+
+    try std.testing.expect(bar == 5);
+}
+
+// example of use
+
+fn asciiToUpper(x: u8) u8 {
+    return switch (x) {
+        'a'...'z' => x + 'A' - 'a',
+        'A'...'Z' => x,
+        else => unreachable,
+    };
+}
+
+test "ascii to upper test" {
+    try std.testing.expect(asciiToUpper('c') == 'C');
+}
+
+// pointers
+
+fn increment(num: *u8) void {
+    num.* += 1;
+}
+
+test "pointers" {
+    var x: u8 = 1;
+    increment(&x);
+    try std.testing.expect(x == 2);
+}
+
+test "naughty pointer" {
+    var x: u16 = 5;
+    x -= 3; // <- change this to 5 and x will have and cannot be casted to y
+    var y: *u8 = @ptrFromInt(x);
+    y = y;
+}
+
+test "const pointers" {
+    // pointer from this is read only
+    const x: u8 = 1;
+    const y = &x;
+
+    try std.testing.expect(y.* == 1);
+}
+
+test "usize" {
+    // usize and isize is like size_t and ssize_t in C
+    // therefore it has 8 bytes in it just like pointers
+    try std.testing.expect(@sizeOf(usize) == @sizeOf(*u8));
+    try std.testing.expect(@sizeOf(isize) == @sizeOf(*u8));
+}
