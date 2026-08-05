@@ -134,6 +134,96 @@ test "multi defer" {
     try std.testing.expect(x == 4.5);
 }
 
+const FileOpenError = error{ AccessDenied, OutOfMemory, FileNotFound };
+const AllocationError = error{OutOfMemory};
+test "Errors" {
+    const err: FileOpenError = AllocationError.OutOfMemory;
+    try std.testing.expect(err == FileOpenError.OutOfMemory);
+}
+
+test "error unions" {
+    const maybe_error: AllocationError!u16 = 10;
+    const no_error = maybe_error catch noreturn;
+
+    try std.testing.expect(@TypeOf(no_error) == u16);
+    try std.testing.expect(no_error == 10);
+}
+// function error payload capturing
+fn failingFunction() error{Oops}!void {
+    return error.Oops;
+}
+test "catch error payload" {
+    failingFunction() catch |err| {
+        std.debug.print("catches the error\n", .{});
+        try std.testing.expect(err == error.Oops);
+        return;
+    };
+}
+// try catch
+fn failFn() error{Oops}!i32 {
+    try failingFunction();
+    return 12;
+}
+
+test "try catch" {
+    const v = failFn() catch |err| {
+        std.debug.print("this we catch it here and expect true if not true then we continue\n", .{});
+        try std.testing.expect(err == error.Oops);
+        return;
+    };
+    try std.testing.expect(v == 12);
+}
+// errdefer
+var problems: u32 = 90;
+fn failFnCounter() error{Oops}!void {
+    errdefer problems += 1; // <- like defer but only works when function is error
+    try failingFunction();
+}
+
+test "errdefer" {
+    failFnCounter() catch |err| {
+        try std.testing.expect(err == error.Oops);
+        try std.testing.expect(problems == 91); // <- true since errdefer problems += 1 will execute since ffailingFunction() it's error
+        return;
+    };
+}
+// implicit error unions
+fn createFile() !void {
+    return error.AccessDenied;
+}
+
+test "implicit error union" {
+    // also catch the error
+    const x: error{AccessDenied}!void = createFile();
+    _ = x catch {};
+    std.debug.print("{any}\n", .{createFile()});
+}
+
+// merging error sets
+
+const A = error{ NotDir, PathNotFound };
+const B = error{ RunTimePanic, OutOfBounds };
+const C = A || B; // <- now you can use C to use both errors from a and b
+
+fn errorAExample() !void {
+    return B.RunTimePanic;
+}
+fn errorBExample() !void {
+    return A.PathNotFound;
+}
+
+// both comes from different error variable but they can both implement C since C implement both a and b
+test "merged error sets" {
+    errorAExample() catch |err| {
+        try std.testing.expect(err == C.RunTimePanic);
+        return;
+    };
+    errorBExample() catch |err| {
+        try std.testing.expect(err == C.PathNotFound);
+        return;
+    };
+}
+
 // functions
 // recursion might cause stack overflow
 fn fibonacci(n: u32) u32 {
