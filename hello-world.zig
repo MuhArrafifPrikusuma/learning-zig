@@ -415,3 +415,57 @@ test "just like go slice" {
     const slices = arrays[0..]; // <- slice to the end
     try std.testing.expect(slices.len == 5);
 }
+// enums
+
+// enum can have specified integer to not waste spaces
+const Value = enum(u2) { zero, one, two };
+const Value1 = enum { nzero, none, ntwo };
+
+test "test enums" {
+    try std.testing.expect(@intFromEnum(Value.zero) == 0);
+    try std.testing.expect(@intFromEnum(Value.one) == 1);
+    try std.testing.expect(@intFromEnum(Value.two) == 2);
+}
+
+// value can be overridden ofcourse
+
+// next will add value of 1 to the very last enum before it
+const OverValue = enum(u16) { ten = 10, hundred = 100, thousand = 1000, next };
+
+test "set enum ordinal value" {
+    try std.testing.expect(@intFromEnum(OverValue.ten) == 10);
+    try std.testing.expect(@intFromEnum(OverValue.hundred) == 100);
+    try std.testing.expect(@intFromEnum(OverValue.thousand) == 1000);
+    try std.testing.expect(@intFromEnum(OverValue.next) == 1001);
+}
+
+// methods in enum
+
+const foos = enum {
+    fooz,
+    bar,
+    baz,
+    pub fn isFooz(self: foos) bool {
+        return self == foos.bar;
+    }
+};
+
+test "enum method" {
+    try std.testing.expect(foos.baz.isFooz() == foos.isFooz(.baz));
+}
+
+// declaration in enum
+
+const Mode = enum(u1) {
+    // this value is unrelated to the enum and will act like a global namespace
+    var count: u32 = 0;
+    on,
+    off,
+};
+
+test "test mode" {
+    Mode.count += 99999;
+    try std.testing.expect(Mode.count == 99999);
+    try std.testing.expect(@intFromEnum(Mode.on) == 0);
+    try std.testing.expect(@intFromEnum(Mode.off) == 1);
+}
