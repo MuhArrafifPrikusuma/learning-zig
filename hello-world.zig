@@ -392,7 +392,7 @@ test "test slices" {
     try std.testing.expect(total(slice) == 7);
 }
 
-// when start and end value of a slice is known at compile time it will produce a pointer to that an array of that slice
+// when start and end value of a slice is known at compile time it will produce a pointer to an array of that slice
 
 test "comptime slice optimization" {
     const arrays = [_]u8{
@@ -468,4 +468,65 @@ test "test mode" {
     try std.testing.expect(Mode.count == 99999);
     try std.testing.expect(@intFromEnum(Mode.on) == 0);
     try std.testing.expect(@intFromEnum(Mode.off) == 1);
+}
+
+// structs
+const Vec = struct { x: f32, y: f32, z: f32 };
+
+test "test struct" {
+    const my_vect = Vec{
+        .x = 0,
+        .y = 100,
+        .z = 50,
+    };
+
+    try std.testing.expect(my_vect.x == 0);
+    try std.testing.expect(my_vect.y == 100);
+    try std.testing.expect(my_vect.z == 50);
+}
+
+test "missing struct fields" {
+    // struct fields cannot but implicitly uninitialized
+    const my_vect = Vec{
+        .x = 100,
+        .z = 20,
+        .y = undefined, // <- if you delete this it will throw an error
+    };
+
+    try std.testing.expect(my_vect.x == 100);
+    try std.testing.expect(my_vect.z == 20);
+}
+
+// struct can be given default value
+const Another_Vec = struct { x: f32 = 0, y: f32 = 0, z: f32 = 0 };
+
+test "test default struct" {
+    const my_vect = Another_Vec{
+        .x = 20,
+        .z = 100,
+    };
+    try std.testing.expect(my_vect.x == 20);
+    try std.testing.expect(my_vect.y == 0); // <- y is zero since well that's the default
+    try std.testing.expect(my_vect.z == 100);
+}
+
+// function inside struct
+
+const stuff = struct {
+    x: i32,
+    y: i32,
+    // functions inside struct will have 1 level automatic dereference
+    fn swap(self: *stuff) void {
+        const tmp = self.x;
+        self.x = self.y;
+        self.y = tmp;
+    }
+};
+
+test "test fn in struct" {
+    var thing = stuff{ .x = 200, .y = 232 };
+    thing.swap();
+
+    try std.testing.expect(thing.x == 232);
+    try std.testing.expect(thing.y == 200);
 }
