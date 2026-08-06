@@ -140,7 +140,6 @@ test "Errors" {
     const err: FileOpenError = AllocationError.OutOfMemory;
     try std.testing.expect(err == FileOpenError.OutOfMemory);
 }
-
 test "error unions" {
     const maybe_error: AllocationError!u16 = 10;
     const no_error = maybe_error catch noreturn;
@@ -226,12 +225,12 @@ test "merged error sets" {
 
 // functions
 // recursion might cause stack overflow
-fn fibonacci(n: u32) u32 {
+fn fibonacci(comptime n: u32) u32 {
     if (n == 0 or n == 1) return n;
     return fibonacci(n - 1) + fibonacci(n - 2);
 }
 
-fn fasterfib(n: u32) u32 {
+fn fasterfib(comptime n: u32) u32 {
     var sum: u32 = 0;
     var i: u32 = 1;
     while (i <= n) : (i += 1) {
@@ -346,4 +345,73 @@ test "usize" {
     // therefore it has 8 bytes in it just like pointers
     try std.testing.expect(@sizeOf(usize) == @sizeOf(*u8));
     try std.testing.expect(@sizeOf(isize) == @sizeOf(*u8));
+}
+
+// multi item pointer
+fn doubleAllManyPointer(buffer: [*]u8, byte_count: usize) void {
+    var i: usize = 0;
+    while (i < byte_count) : (i += 1) buffer[i] *= 2;
+}
+
+test "multi-items pointers" {
+    // ** is array repetition operator used to copy this array 100 times
+    var buffer: [100]u8 = [_]u8{1} ** 100;
+    const buffer_ptr: *[100]u8 = &buffer;
+
+    // this buffer_many_ptr behave like C arrays which points to the very first elements in that address
+    // which mean this is unsafe and can overlow
+    const buffer_many_ptr: [*]u8 = buffer_ptr;
+    doubleAllManyPointer(buffer_many_ptr, buffer.len);
+    for (buffer) |byte| {
+        std.debug.print("{d}\n", .{byte});
+        try std.testing.expect(byte == 2);
+    }
+
+    // same address
+    const first_element_ptr: *u8 = &buffer_many_ptr[0];
+    // this also target the first element since it's converted to *u8 type
+    const first_element_ptr_2: *u8 = @ptrCast(buffer_many_ptr);
+
+    try std.testing.expect(first_element_ptr == first_element_ptr_2);
+}
+
+// slices here is like slices in go
+
+fn total(values: []const u8) usize {
+    var sum: usize = 0;
+    for (values) |v| {
+        sum += v;
+        std.debug.print("items: {d}\n", .{v});
+    }
+    return sum;
+}
+
+test "test slices" {
+    const arrays = [_]u8{ 2, 2, 3, 4, 5, 6, 7, 8 };
+    const slice = arrays[0..3];
+    try std.testing.expect(total(slice) == 7);
+}
+
+// when start and end value of a slice is known at compile time it will produce a pointer to that an array of that slice
+
+test "comptime slice optimization" {
+    const arrays = [_]u8{
+        5,
+        3,
+        1,
+        3,
+        54,
+        3,
+        2,
+    };
+    const comptimeSlice = arrays[1..4];
+    for (comptimeSlice) |v| std.debug.print("val: {d}\n", .{v});
+
+    try std.testing.expect(@TypeOf(comptimeSlice) == *const [3]u8);
+}
+
+test "just like go slice" {
+    const arrays = [_]u8{ 1, 2, 3, 4, 5 };
+    const slices = arrays[0..]; // <- slice to the end
+    try std.testing.expect(slices.len == 5);
 }
