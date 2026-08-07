@@ -563,3 +563,42 @@ test "switch on tagged unions" {
 
     try std.testing.expect(value.a == 2);
 }
+
+// integer rules
+// all numeric bases that zig supported
+const decimal: i32 = 10;
+const hex: u8 = 0x0a;
+const another_hex: u8 = 0x0A;
+const octal: u16 = 0o012;
+const binary: u8 = 0b00001010;
+
+// visual separator with underscores
+
+const decimal_sp: i32 = 1_000_000;
+const another_hex_sp: u64 = 0xFF00_02FA_00F1;
+const octal_sp: u16 = 0o7_2_3;
+const binary_sp: u8 = 0b0000_1010;
+
+// this bullshit is also possible
+// can go from 0 to 65535 bits
+const stupid_small: u0 = 0; // <- this shit will overflow if more than 0
+const stupid_large: u65535 = 99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999;
+
+test "allowed integers" {
+    std.debug.print("a: {d}\n", .{decimal});
+    std.debug.print("b: {d}\n", .{hex});
+    std.debug.print("c: {d}\n", .{another_hex});
+    std.debug.print("d: {d}\n", .{octal});
+    std.debug.print("e: {d}\n", .{binary});
+    std.debug.print("f: {d}\n", .{decimal_sp});
+    std.debug.print("g: {d}\n", .{another_hex_sp});
+    std.debug.print("h: {d}\n", .{binary_sp});
+    std.debug.print("i: {d}\n", .{stupid_small});
+    std.debug.print("j: {d}\n", .{stupid_large});
+}
+
+test "@intcast" {
+    const x: u64 = 200;
+    const y: u8 = @as(u8, x);
+    try std.testing.expect(@TypeOf(y) == u8);
+}
