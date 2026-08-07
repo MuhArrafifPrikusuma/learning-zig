@@ -602,3 +602,14 @@ test "@intcast" {
     const y: u8 = @as(u8, x);
     try std.testing.expect(@TypeOf(y) == u8);
 }
+
+// packed struct will squish all values that it has at bit level
+// which mean this takes exactly 1 bytes instead of 5 bytes
+const pstruct = packed struct { a: u1, b: u1, c: u2, d: u2, e: u2 };
+
+test "packed struct" {
+    const struct_size = @sizeOf(pstruct);
+    std.debug.print("struct size: {d}\n", .{struct_size});
+    try std.testing.expect(struct_size == 1);
+}
+// floats
