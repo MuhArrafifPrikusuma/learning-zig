@@ -530,3 +530,36 @@ test "test fn in struct" {
     try std.testing.expect(thing.x == 232);
     try std.testing.expect(thing.y == 200);
 }
+
+// unions
+// union act as one types that store one value of many possible data types
+const Result = union {
+    int: i64,
+    float: f64,
+    bool: bool,
+};
+
+// you cannot use 2 data types
+test "simple union" {
+    const result = Result{ .int = 1234 };
+    // uncomment this and it will throw an error
+    // result.float = 12.34;
+    try std.testing.expect(result.int == 1234);
+}
+
+// tagged unions
+const Tag = enum { a, b, c };
+// now it used the enum as a tag to determine which field is active
+const Tagged = union(Tag) { a: u8, b: f32, c: bool };
+
+test "switch on tagged unions" {
+    // this will automatically perform different operation based on which Tag it has
+    var value = Tagged{ .a = 1 };
+    switch (value) {
+        .a => |*byte| byte.* += 1,
+        .b => |*float| float.* *= 2,
+        .c => |*b| b.* = !b.*,
+    }
+
+    try std.testing.expect(value.a == 2);
+}
