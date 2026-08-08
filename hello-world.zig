@@ -662,3 +662,62 @@ test "int float conversion" {
     try std.testing.expect(@TypeOf(c) == @TypeOf(a));
     try std.testing.expect(@TypeOf(c) != @TypeOf(b));
 }
+
+test "labeled blocks" {
+    const count = blk: {
+        var sum: u32 = 0;
+        var i: u32 = 1;
+        while (i <= 10) : (i += 1) sum += i;
+        // break <block-name> <return-variable>
+        break :blk sum;
+    };
+    try std.testing.expect(count == 55);
+}
+
+// loop labels
+// breaking and continuing outer loops from inner loops is possible here
+
+test "loop blocks label" {
+    var count: usize = 0;
+    outer: for ([_]i32{ 1, 2, 3, 4, 5, 6, 7, 8, 9 }) |_| {
+        for ([_]i32{ 1, 2, 3, 4, 5 }) |_| {
+            count += 1;
+            // it will only reach 9 since inner loop will only run once before forcing outer loop to move
+            continue :outer;
+        }
+    }
+    try std.testing.expect(count == 9);
+}
+
+// loops as expression
+
+fn hasNumber(begin: usize, end: usize, number: usize) bool {
+    var i = begin;
+    return while (i < end) : (i += 1) {
+        if (i == number)
+            break true;
+    } else false;
+}
+
+test "loop have return value" {
+    const tc = struct {
+        begin: usize,
+        end: usize,
+        number: usize,
+        expect: bool,
+    };
+
+    const tcs = [_]tc{
+        .{ .begin = 0, .end = 10, .number = 3, .expect = true },
+        .{ .begin = 4, .end = 2, .number = 3, .expect = false },
+        .{ .begin = 5, .end = 10, .number = 8, .expect = true },
+        .{ .begin = 3, .end = 100, .number = 11, .expect = true },
+        .{ .begin = 4, .end = 8, .number = 5, .expect = true },
+    };
+
+    for (tcs) |val| {
+        const is_succes = hasNumber(val.begin, val.end, val.number);
+        std.debug.print("{}\n", .{is_succes});
+        try std.testing.expect(is_succes == val.expect);
+    }
+}
