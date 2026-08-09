@@ -846,3 +846,71 @@ test "@Int" {
     try std.testing.expect(comptime DoubleIntSize(u32) == u64);
     try std.testing.expect(comptime DoubleIntSize(i4) == i8);
 }
+
+// @This and generics
+pub fn TestCreateVect(comptime count: comptime_int, comptime T: type) type {
+    return struct {
+        data: [count]T,
+        const Self = @This(); // <- returns the struct where it's called
+        // this is very usefull for something like this annonymous struct so that it can call itself
+
+        // Self.Self.Self.Self.Self.Self.Self.Self.Self.Self.Self.Self.Self.Self.Self.Self.Self.Self.Self.Self.Self.init(...);
+        // yes that's a valid syntax
+        fn abs(self: Self) Self {
+            var tmp = Self{ .data = undefined };
+            for (self.data, 0..) |value, i| {
+                tmp.data[i] = if (value < 0)
+                    -value
+                else
+                    value;
+            }
+            return tmp;
+        }
+
+        fn init(data: [count]T) Self {
+            return Self{ .data = data };
+        }
+    };
+}
+
+test "generic vector" {
+    const x = comptime TestCreateVect(3, i8).init([_]i8{ -10, -10, 5 });
+    const y = comptime x.abs();
+    // you can chain Self infinitely but why?
+    const foo = comptime TestCreateVect(3, i8).Self.Self.Self.Self.init([_]i8{ -1, -3, -4 });
+    const bar = comptime foo.abs();
+
+    try std.testing.expect(std.mem.eql(i8, &y.data, &[_]i8{ 10, 10, 5 }));
+    try std.testing.expect(std.mem.eql(i8, &bar.data, &[_]i8{ 1, 3, 4 }));
+}
+
+// anytype
+// line any in go it generate multiple functions based on what type you pass to it
+fn plusOne(x: anytype) @TypeOf(x) {
+    return x + 1;
+}
+
+test "plusOne test" {
+    try std.testing.expect(plusOne(@as(u2, 2)) == 3);
+}
+
+// comptime also introduce concatenating operator (++) and repeating operator (**)
+// that can be used with array and slices
+
+test "++" {
+    const foo: [4]u8 = undefined;
+    const fooss = foo[0..];
+    const bar: [6]u8 = undefined;
+    const bars = bar[0..];
+
+    // combine both slices
+    const baz = fooss ++ bars;
+    try std.testing.expect(baz.len == 10);
+}
+
+test "**" {
+    const array1 = [_]u8{ 0xCC, 0xAA };
+    const cpycpycpy = array1 ** 3; // repeat this array 3 times (is still in continuous block)
+    try std.testing.expect(std.mem.eql(u8, &cpycpycpy, &[_]u8{ 0xCC, 0xAA, 0xCC, 0xAA, 0xCC, 0xAA }));
+    try std.testing.expect(cpycpycpy.len == 6);
+}
