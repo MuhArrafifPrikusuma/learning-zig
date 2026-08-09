@@ -721,3 +721,67 @@ test "loop have return value" {
         try std.testing.expect(is_succes == val.expect);
     }
 }
+test "optionals" {
+    var found_index: ?usize = null;
+    const data = [_]i32{ 1, 2, 3, 4, 5, 7, 8, 12, 22, 24, 48 };
+    const data2 = [_]i32{ 1, 2, 3, 4, 5, 7, 8, 12, 22, 24, 48 };
+    var pos: u2 = 0;
+    found_index = @as(?usize, outer: while (pos < 2) : (pos += 1) {
+        for (data, 0..) |value, i| {
+            if (value == 10) break :outer i;
+        }
+        for (data2, 0..) |value, i| {
+            if (value == 10) break :outer i;
+        }
+    } else null);
+
+    try std.testing.expect(found_index == null);
+}
+
+// if the optional value contain a value then it will return that value but
+// when it contains something like null it will unwraps to the fallback value
+test "orelse" {
+    const a: ?u8 = null;
+    const fallback: u8 = 10;
+    const b = a orelse fallback;
+    try std.testing.expect(b == 10);
+    try std.testing.expect(@TypeOf(b) == u8);
+}
+
+// opposite of the one above, now if you know the value can't be null, it will unwraps to null in safe mode
+// and will omit the check completely for ReleaseFast or ReleaseSmall
+test "orelse unreachable" {
+    const a: ?f32 = 2;
+    // NOTE: always put compError so that you don't accidentally change the code in the future to allow that unwanted behavior
+    comptime {
+        if (a == null)
+            @compileError("a can't be null");
+    }
+    const b = a orelse unreachable;
+    const c = a.?; // <- this is just another way to write oorelse unreachable
+    try std.testing.expect(b == c);
+    try std.testing.expect(@TypeOf(c) == f32);
+}
+
+test "optional payload capture" {
+    var a: ?f32 = 2;
+    // if you pass ?T to if it will check whether is null or not and it will be false if null
+    if (a) |*value|
+        value.* += 1;
+
+    try std.testing.expect(a == 3);
+}
+
+var numbers_left: u32 = 4;
+fn eventuallyNullSequence() ?u32 {
+    if (numbers_left == 0) return null;
+    numbers_left -= 1;
+    return numbers_left;
+}
+
+test "optional while payload capture" {
+    var sum: u32 = 0;
+    while (eventuallyNullSequence()) |val|
+        sum += val;
+    try std.testing.expect(sum == 6);
+}
