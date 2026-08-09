@@ -781,7 +781,68 @@ fn eventuallyNullSequence() ?u32 {
 
 test "optional while payload capture" {
     var sum: u32 = 0;
+    // this will repeat until null
     while (eventuallyNullSequence()) |val|
         sum += val;
     try std.testing.expect(sum == 6);
+}
+
+test "comptime" {
+    const a: u32 = comptime fasterfib(10);
+    const b: u32 = comptime blk: {
+        break :blk fasterfib(10);
+    };
+
+    try std.testing.expect(a == 55);
+    try std.testing.expect(b == a);
+}
+
+test "comptime floats" {
+    // types in zig is a value of type which mean branching a type is possible
+    const a: f32 = 20;
+    const b: if (a < 10) f32 else i32 = a; // <- this is comptime contant the type is defined an comptime not runtime it's impossible to define type and runtime and also dangerous why would you turn zig into javascript anyway
+    try std.testing.expect(b == 20);
+    try std.testing.expect(@TypeOf(b) == i32);
+}
+
+// use pascal case for function that returns type, it even has it's own hightlight color on zls therefore making it easier for me
+// and yes i mean that, zig function can return a type which can make it like generics, but better at runtime
+fn Matrix(comptime T: type, comptime width: comptime_int, comptime heigth: comptime_int) type {
+    return [heigth][width]T; // <- in this example it returns 2d arrays with the type of whatever the caller gave
+}
+
+test "returning a type" {
+    const MyMatrix = Matrix(f32, 5, 5);
+    try std.testing.expect(Matrix(f32, 5, 5) == MyMatrix);
+}
+
+// @typeInfo
+
+fn addSmallInt(comptime T: type, a: T, b: T) T {
+    return switch (@typeInfo(T)) {
+        .comptime_int => a + b,
+        .int => |info| if (info.bits <= 32)
+            a + b
+        else
+            @compileError("integers to larger"),
+        else => @compileError("can only accept int type"),
+    };
+}
+
+test "test typeinfo" {
+    const x = addSmallInt(i32, 32, 32);
+    try std.testing.expect(@TypeOf(x) == i32);
+    try std.testing.expect(x == 64);
+}
+
+// @Int
+
+fn DoubleIntSize(comptime T: type) type {
+    const info = @typeInfo(T).int;
+    return @Int(info.signedness, info.bits * 2);
+}
+
+test "@Int" {
+    try std.testing.expect(comptime DoubleIntSize(u32) == u64);
+    try std.testing.expect(comptime DoubleIntSize(i4) == i8);
 }
