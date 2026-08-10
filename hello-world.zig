@@ -1010,3 +1010,18 @@ test "captures with pointers to modify it" {
     for (&data) |*value| value.* += 1;
     try std.testing.expect(std.mem.eql(u8, &data, &[_]u8{ 2, 3, 4 }));
 }
+
+// inline loops
+// this unroll the loops making it faster but can cause problem and the performance gain is not that much
+// and might even slow things down and bloat the binary size therefore test carefully and make sure everything
+// work and the loop is actually faster if unrolled
+
+test "inline loops" {
+    const types = [_]type{ i32, u32, f16, bool };
+    var sum: usize = 0;
+    inline for (types) |T| sum += @sizeOf(T);
+
+    try std.testing.expect(sum == 11);
+}
+
+// opaque
