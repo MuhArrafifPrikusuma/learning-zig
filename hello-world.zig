@@ -914,3 +914,99 @@ test "**" {
     try std.testing.expect(std.mem.eql(u8, &cpycpycpy, &[_]u8{ 0xCC, 0xAA, 0xCC, 0xAA, 0xCC, 0xAA }));
     try std.testing.expect(cpycpycpy.len == 6);
 }
+
+// payload captures
+
+test "optional if" {
+    const maybe: ?i32 = 5;
+    if (maybe) |val| {
+        try std.testing.expect(@TypeOf(val) == i32);
+        try std.testing.expect(val == 5);
+    } else unreachable;
+}
+
+const Unknown = error{unknownEntity};
+test "with error unions" {
+    const maybeError: Unknown!u32 = Unknown.unknownEntity;
+    if (maybeError) |n| {
+        try std.testing.expect(@TypeOf(n) == u32);
+        try std.testing.expect(n == 10);
+    } else |err| {
+        _ = err catch {
+            std.debug.print("error: {}\n", .{err});
+            try std.testing.expect(err == Unknown.unknownEntity);
+        };
+    }
+}
+
+// while loops optionals
+
+test "while optional payload captures" {
+    const sequence = [_]?u8{ 0x0A, 0x0B, 0x0C, null };
+    var i: usize = 0;
+    // it will stop if it's null
+    while (sequence[i]) |num| : (i += 1)
+        try std.testing.expect(@TypeOf(num) == u8);
+
+    try std.testing.expect(i == 3);
+    try std.testing.expect(sequence[i] == null);
+}
+
+// while error union capture
+
+var numbers_left2: u32 = undefined;
+fn eventuallyErrorSequence() !u32 {
+    return if (numbers_left2 == 0) error.ReachedZero else blk: {
+        numbers_left2 -= 1;
+        break :blk numbers_left2;
+    };
+}
+
+test "while error union payload capture" {
+    var sum: u32 = 0;
+    numbers_left2 = 4;
+    while (eventuallyErrorSequence()) |value| {
+        sum += value;
+    } else |err| try std.testing.expect(err == error.ReachedZero);
+
+    try std.testing.expect(sum == 6);
+}
+
+// for loops
+
+test "for loops payload captures" {
+    const x = [_]i8{ 1, 5, -20, -5 };
+    for (x) |value| try std.testing.expect(@TypeOf(value) == i8);
+}
+
+// switch cases on tagged unions
+
+const Info = union(enum) {
+    a: u32,
+    b: f32,
+    c,
+    d: u32,
+};
+
+test "switch capture" {
+    const b: Info = .{ .a = 20 };
+    const x = switch (b) {
+        .a, .d => |num| blk: {
+            try std.testing.expect(@TypeOf(num) == u32);
+            break :blk num * 2;
+        },
+        .c => 2,
+        .b => |floaters| blk: {
+            try std.testing.expect(@TypeOf(floaters) == f32);
+            break :blk floaters / 2;
+        },
+    };
+
+    try std.testing.expect(x == 40);
+}
+
+test "captures with pointers to modify it" {
+    var data = [_]u8{ 1, 2, 3 };
+    for (&data) |*value| value.* += 1;
+    try std.testing.expect(std.mem.eql(u8, &data, &[_]u8{ 2, 3, 4 }));
+}
