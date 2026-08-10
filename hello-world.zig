@@ -1057,3 +1057,30 @@ test "opaque with declaration" {
     const capture_return = new_window.addOne();
     std.debug.print("it return: {s}\n", .{capture_return});
 }
+
+// annonymous sturcts
+
+test "annonymous struct literal" {
+    const Point = struct { x: i32, y: i32 };
+
+    const pt: Point = .{
+        .x = 13,
+        .y = 20,
+    };
+
+    try std.testing.expect(pt.x == 13 and pt.y == 20);
+}
+
+// there are five possible place where comptime can be placed in this block, can you find it?
+// <<= start blk =>>
+fn dump(args: anytype) !void {
+    try std.testing.expect(args.int == 1234);
+    try std.testing.expect(args.float == 5.5);
+    try std.testing.expect(args.b);
+    try std.testing.expect(std.mem.eql(u8, &args.s, "hello"));
+}
+
+test "fully annonymous struct" {
+    try comptime dump(.{ .int = @as(i32, 1234), .float = @as(f16, 5.5), .b = true, .s = "hello".* });
+}
+// <<= end blk =>>
