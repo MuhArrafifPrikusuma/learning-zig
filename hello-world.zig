@@ -1007,6 +1007,7 @@ test "switch capture" {
 
 test "captures with pointers to modify it" {
     var data = [_]u8{ 1, 2, 3 };
+    // payload capture value is also immutable by default
     for (&data) |*value| value.* += 1;
     try std.testing.expect(std.mem.eql(u8, &data, &[_]u8{ 2, 3, 4 }));
 }
@@ -1025,3 +1026,34 @@ test "inline loops" {
 }
 
 // opaque
+// this is basically void pointer with type safety, the void* equivalent in zig is anyopaque type
+
+const Window = opaque {};
+const Button = opaque {};
+
+// extern fn show_window(*Window) callconv(.c) void;
+
+test "opaque" {
+    // this succeded
+    // const main_window: *Window = undefined;
+    // show_window(main_window);
+
+    // this example will throw an error since this isn't the generic *Window type
+    // const this_button: *Button = undefined;
+    // show_window(this_button);
+}
+
+// opaque can also have declaration inside of it just any other complex types
+
+const Windows = opaque {
+    fn addOne(self: *Windows) []const u8 {
+        _ = self;
+        return "succes";
+    }
+};
+
+test "opaque with declaration" {
+    var new_window: *Windows = undefined;
+    const capture_return = new_window.addOne();
+    std.debug.print("it return: {s}\n", .{capture_return});
+}
