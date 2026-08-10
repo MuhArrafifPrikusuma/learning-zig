@@ -877,7 +877,7 @@ test "generic vector" {
     const x = comptime TestCreateVect(3, i8).init([_]i8{ -10, -10, 5 });
     const y = comptime x.abs();
     // you can chain Self infinitely but why?
-    const foo = comptime TestCreateVect(3, i8).Self.Self.Self.Self.init([_]i8{ -1, -3, -4 });
+    const foo = comptime TestCreateVect(3, i8).Self.Self.Self.Self.Self.Self.Self.Self.Self.Self.Self.Self.Self.Self.Self.Self.Self.Self.Self.Self.Self.Self.Self.Self.init([_]i8{ -1, -3, -4 });
     const bar = comptime foo.abs();
 
     try std.testing.expect(std.mem.eql(i8, &y.data, &[_]i8{ 10, 10, 5 }));
@@ -1082,6 +1082,40 @@ fn dump(args: anytype) !void {
 
 test "fully annonymous struct" {
     // you can also use @This inside the struct to reference itself
-    try comptime dump(.{ .int = @as(i32, 1234), .float = @as(f16, 5.5), .b = true, .s = "hello".* });
+    try comptime dump(.{
+        .int = @as(i32, 1234),
+        .float = @as(f16, 5.5),
+        .b = true,
+        .s = "hello".*,
+    });
 }
 // <<= end blk =>>
+
+// this has the properties that array do, which mean it can be indexed, sliced and iterated
+test "tuples" {
+    // there are two ways to make tuple, using annonymous struct to create tuple value
+    // or using @Tuple to create tuple type
+    const tupleType = @Tuple(&.{
+        u32,
+        f32,
+        bool,
+        []const u8,
+    });
+
+    const values = tupleType{
+        @as(u32, 1234),
+        @as(f32, 12.5),
+        true,
+        &"hello".*,
+    } ++ .{false} ** 2; // <- this add two false to the tuple
+    try std.testing.expect(values[0] == 1234 and @TypeOf(values[0]) == u32);
+    try std.testing.expect(values[4] == false and @TypeOf(values[4]) == bool);
+    try std.testing.expect(values[5] == false and @TypeOf(values[4]) == bool);
+    inline for (values) |val| {
+        if (@TypeOf(val) != bool) continue;
+        try std.testing.expect(@TypeOf(val) == bool);
+    }
+    try std.testing.expect(values.len == 6);
+    // you can also do this weird bullshit to get specific array index from array inside of an array
+    try std.testing.expect(values.@"3"[4] == 'o');
+}
