@@ -1081,6 +1081,7 @@ fn dump(args: anytype) !void {
 }
 
 test "fully annonymous struct" {
+    // you can also use @This inside the struct to reference itself
     try comptime dump(.{ .int = @as(i32, 1234), .float = @as(f16, 5.5), .b = true, .s = "hello".* });
 }
 // <<= end blk =>>
