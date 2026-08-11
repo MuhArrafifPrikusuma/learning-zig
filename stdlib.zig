@@ -82,3 +82,21 @@ test "smpAlloc" {
 
     try std.testing.expect(bytes.len == 2000);
 }
+
+// ArrayList, a way to make string without shooting yourself
+// best used for runtime slices
+
+test "ArrayList" {
+    const allocator = std.testing.allocator;
+    var list: std.ArrayList(u8) = .empty;
+    defer list.deinit(allocator);
+    try list.append(allocator, 'H');
+    try list.append(allocator, 'E');
+    try list.append(allocator, 'L');
+    try list.append(allocator, 'L');
+    try list.append(allocator, 'O');
+    try list.append(allocator, '!');
+    try list.appendSlice(allocator, ", World!");
+
+    try std.testing.expect(std.mem.eql(u8, list.items, "HELLO!, World!"));
+}
