@@ -1095,7 +1095,7 @@ test "fully annonymous struct" {
 test "tuples" {
     // there are two ways to make tuple, using annonymous struct to create tuple value
     // or using @Tuple to create tuple type
-    const tupleType = @Tuple(&.{
+    const tupleType = @Tuple(&.{ // <- can be used for comptime generic type processing
         u32,
         f32,
         bool,
@@ -1111,11 +1111,64 @@ test "tuples" {
     try std.testing.expect(values[0] == 1234 and @TypeOf(values[0]) == u32);
     try std.testing.expect(values[4] == false and @TypeOf(values[4]) == bool);
     try std.testing.expect(values[5] == false and @TypeOf(values[4]) == bool);
+    // normal loops strict type checking cannot iterate over a tuple therefore we need to use
+    // inline loops
     inline for (values) |val| {
         if (@TypeOf(val) != bool) continue;
         try std.testing.expect(@TypeOf(val) == bool);
     }
+
     try std.testing.expect(values.len == 6);
     // you can also do this weird bullshit to get specific array index from array inside of an array
     try std.testing.expect(values.@"3"[4] == 'o');
+}
+
+// sentinel termination, basically null termination
+
+test "sentinel termination" {
+    const terminated = [3:0]u8{ 3, 2, 1 };
+    try std.testing.expect(terminated.len == 3);
+    try std.testing.expect(@as(*const [4]u8, @ptrCast(&terminated))[3] == 0);
+}
+
+test "string literal" {
+    try std.testing.expect(@TypeOf("hello") == *const [5:0]u8);
+}
+
+test "C string" {
+    const c_string: [*:0]const u8 = "hello";
+    var arrays: [5]u8 = undefined;
+
+    var i: usize = 0;
+    while (c_string[i] != 0) : (i += 1) {
+        arrays[i] = c_string[i];
+    }
+    for (arrays, 0..) |v, ix| {
+        try std.testing.expect(v == c_string[ix]);
+    }
+}
+
+// coercion to their non sentinel terminated type
+
+test "coercion" {
+    const a: [*:0]const u8 = "test";
+    const b: [*]const u8 = a;
+
+    const c: [3:0]u8 = "lol".*;
+    const d: [3]u8 = c[0..].*;
+
+    var buffer: [3:0]f32 = .{ 1.2, 2.2, 3.2 };
+    const e: [:0]f32 = buffer[0.. :0];
+    const f: []f32 = e;
+
+    try std.testing.expect(a == b);
+    try std.testing.expect(std.mem.eql(u8, &c, &d));
+    try std.testing.expect(e.ptr == f.ptr);
+}
+
+test "sentinel terminated slicing" {
+    var x = [_:0]u8{255} ** 3;
+    const y = x[0.. :0];
+    try std.testing.expect(@TypeOf(x) != @TypeOf(y));
+    try std.testing.expect(@TypeOf(y.ptr) == [*:0]u8);
 }
