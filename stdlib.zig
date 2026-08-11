@@ -100,3 +100,28 @@ test "ArrayList" {
 
     try std.testing.expect(std.mem.eql(u8, list.items, "HELLO!, World!"));
 }
+
+// Filesystem
+test "create, write, seekto, read" {
+    const io = std.testing.io; // <- use init io in non testing env
+    const file = try std.Io.Dir.cwd().createFile(io, "junkfile.txt", .{ .read = true });
+    defer {
+        file.close(io);
+        std.Io.Dir.cwd().deleteFile(io, "junkfile.txt") catch {};
+    }
+
+    const expected_String = "Hello World!";
+
+    var write_buffer: [100]u8 = undefined;
+    var writer = file.writer(io, &write_buffer);
+    try writer.interface.writeAll(expected_String);
+
+    try writer.flush(); // flush buffer to file immediately
+
+    var read_buffer: [4096]u8 = undefined;
+    var reader = file.reader(io, &read_buffer);
+    const bytes_read = try reader.interface.readSliceShort(&read_buffer);
+
+    std.debug.print("string in read: {s}\n", .{read_buffer[0..bytes_read]});
+    try std.testing.expectEqualStrings(expected_String, read_buffer[0..bytes_read]);
+}
