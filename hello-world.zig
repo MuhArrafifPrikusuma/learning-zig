@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 
 pub fn main() void {
     std.debug.print("Hello, {s}!\n", .{"world"});
@@ -1172,3 +1173,40 @@ test "sentinel terminated slicing" {
     try std.testing.expect(@TypeOf(x) != @TypeOf(y));
     try std.testing.expect(@TypeOf(y.ptr) == [*:0]u8);
 }
+
+// Vectors best used for SIMD ofcourse
+
+test "Vector" {
+    // this is SIMD
+    const x: @Vector(4, u8) = .{ 1, 2, 3, 4 };
+    const y: @Vector(4, u8) = .{ 4, 3, 2, 1 };
+    const z = x + y;
+    try std.testing.expect(std.meta.eql(z, @Vector(4, u8){ 5, 5, 5, 5 }));
+}
+
+test "Vector indexing" {
+    const x: @Vector(4, u8) = .{ 2, 10, 100, 33 };
+    try std.testing.expect(x[0] == 2);
+}
+
+test "Vector * scalar" {
+    const x: @Vector(4, u8) = .{ 23, 25, 11, 23 };
+    const y = x + @as(@Vector(4, u8), @splat(2)); // <- all the element inside Vector is now 2
+    try std.testing.expect(std.meta.eql(y, @Vector(4, u8){ 25, 27, 13, 25 }));
+    try std.testing.expect(std.meta.eql(x, @Vector(4, u8){ 23, 25, 11, 23 }));
+}
+
+test "Vector looping" {
+    const data_stream = [_]u8{ 2, 3, 41, 2, 33, 12, 23, 23, 53, 43, 21, 21, 32, 53, 12, 43, 21, 43, 12 };
+
+    const sum = blk: {
+        var tmp: u16 = 0;
+        var i: u8 = 0;
+        while (i < data_stream.len) : (i += 1) tmp += data_stream[i];
+        break :blk tmp;
+    };
+
+    std.debug.print("sum: {d}\n", .{sum});
+    try std.testing.expect(sum == 493);
+}
+// NOTE: Vectors can coerce with array;
