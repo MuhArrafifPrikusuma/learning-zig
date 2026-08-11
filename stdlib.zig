@@ -1,0 +1,84 @@
+const std = @import("std");
+
+test "Allocators" {
+    // this is extreamly inefficient since it perform syscall and also
+    // ask the OS for a whole page of memory so it can take kibibytes of memory even if
+    // i only allocate like 1 byte
+    const Allocator = std.heap.page_allocator;
+
+    const memory = try Allocator.alloc(u8, 100);
+    defer Allocator.free(memory);
+
+    try std.testing.expect(memory.len == 100);
+    try std.testing.expect(@TypeOf(memory) == []u8);
+}
+
+test "fixed buffer allocator" {
+    // this one cannot exceed the amount of buffer that you initiated
+    var buffer: [1000]u8 = undefined;
+    var fba = std.heap.FixedBufferAllocator.init(&buffer);
+    const allocator = fba.allocator();
+
+    // this is the maximum, oh btw you can allocate multiple stuff too aslong it fits in the buffer
+    const memory = try allocator.alloc(u8, 500);
+    defer allocator.free(memory);
+    const memory2 = try allocator.alloc(u8, 500);
+
+    try std.testing.expect(memory.len == 500);
+    try std.testing.expect(memory2.len == 500);
+}
+
+test "Arena allocator" {
+    // take a child allocator and allow you to free all the allocator by freeing the arena
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit(); // <- free all of the child allocator
+
+    const allocator = arena.allocator();
+
+    _ = try allocator.alloc(u8, 1);
+    _ = try allocator.alloc(u8, 10);
+    _ = try allocator.alloc(u8, 100);
+    _ = try allocator.alloc(u8, 1000);
+    _ = try allocator.alloc(u8, 10000);
+    _ = try allocator.alloc(u8, 100000);
+}
+
+// free and alloc is used for slices, for single item use this
+test "create and destroy" {
+    const byte = try std.heap.page_allocator.create(u8);
+    defer std.heap.page_allocator.destroy(byte);
+    byte.* = 128;
+    try std.testing.expect(byte.* == 128);
+}
+
+// general purpose debug allocator that can prevent use after free and detect leak
+// and even thread safety, all of those can also be turned off via it's configuration
+// struct. this allocator purpose is safety over performance but it's still might perform
+// better than page allocator since it doesn't ask for a whole page
+test "gpa" {
+    // it's also good for testing
+    var gpa = std.heap.DebugAllocator(.{}).init;
+    const allocator = gpa.allocator();
+    defer {
+        const deinit_status = gpa.deinit();
+
+        // if i didn't free it then throw an error
+        if (deinit_status == .leak) std.testing.expect(false) catch @panic("TEST FAIL");
+    }
+    const bytes = try allocator.alloc(u8, 200);
+    defer allocator.free(bytes);
+
+    try std.testing.expect(bytes.len == 200);
+}
+
+// std.heap.SmpAllocator is a general purpose allocator that was built for maximum perf
+// with very few safety features
+
+test "smpAlloc" {
+    const allocator = std.heap.smp_allocator;
+
+    const bytes = try allocator.alloc(u8, 2000);
+    defer allocator.free(bytes);
+
+    try std.testing.expect(bytes.len == 2000);
+}
