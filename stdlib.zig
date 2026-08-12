@@ -125,3 +125,39 @@ test "create, write, seekto, read" {
     std.debug.print("string in read: {s}\n", .{read_buffer[0..bytes_read]});
     try std.testing.expectEqualStrings(expected_String, read_buffer[0..bytes_read]);
 }
+
+// file stat
+
+test "file stats" {
+    const Io = std.testing.io;
+    const file = try std.Io.Dir.cwd().createFile(Io, "idkfile.txt", .{ .read = true });
+    defer {
+        file.close(Io);
+        std.Io.Dir.cwd().deleteFile(Io, "idkfile.txt") catch {};
+    }
+
+    const content = "Hello!";
+    var write_buffer: [100]u8 = undefined;
+    var writer = file.writer(Io, &write_buffer);
+    try writer.interface.writeAll(content);
+    try writer.flush();
+
+    var read_buffer: [4096]u8 = undefined;
+    var reader = file.reader(Io, &read_buffer);
+
+    var dest_buffer: [4096]u8 = undefined;
+
+    const bytes_read = try reader.interface.readSliceShort(&dest_buffer);
+    const sliceRead = dest_buffer[0..bytes_read];
+
+    const stat = try file.stat(Io);
+
+    try std.testing.expectEqualStrings(content, sliceRead);
+    try std.testing.expect(stat.kind == .file);
+    try std.testing.expect(stat.ctime.toNanoseconds() <= std.Io.Clock.now(.real, Io).toNanoseconds());
+    try std.testing.expect(stat.mtime.toNanoseconds() <= std.Io.Clock.now(.real, Io).toNanoseconds());
+    try std.testing.expect(stat.atime.?.toNanoseconds() <= std.Io.Clock.now(.real, Io).toNanoseconds());
+
+    std.debug.print("fileSize {d} bytes and contain:\n", .{stat.size});
+    std.debug.print("{s}\n", .{sliceRead});
+}
