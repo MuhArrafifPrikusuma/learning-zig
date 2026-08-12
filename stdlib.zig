@@ -161,3 +161,26 @@ test "file stats" {
     std.debug.print("fileSize {d} bytes and contain:\n", .{stat.size});
     std.debug.print("{s}\n", .{sliceRead});
 }
+
+test "make dir" {
+    const Io = std.testing.io;
+    try std.Io.Dir.cwd().createDir(Io, "test-dir", .default_dir);
+    var iter_dir = try std.Io.Dir.cwd().openDir(Io, "test-dir", .{ .iterate = true });
+
+    defer {
+        iter_dir.close(Io);
+        std.Io.Dir.cwd().deleteTree(Io, "test-dir") catch unreachable;
+    }
+
+    _ = try iter_dir.createFile(Io, "a", .{ .read = true });
+    _ = try iter_dir.createFile(Io, "b", .{ .read = true });
+    _ = try iter_dir.createFile(Io, "c", .{ .read = true });
+
+    var file_count: usize = 0;
+    var iterate_over = iter_dir.iterate();
+    while (try iterate_over.next(Io)) |entry| {
+        if (entry.kind == .file) file_count += 1;
+    }
+
+    try std.testing.expect(file_count == 3);
+}
