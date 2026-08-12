@@ -206,6 +206,8 @@ test "reading from file" {
     const stat = try file.stat(Io);
 
     // i read the whole file so use unbuffered rader;
+    // the standard buffer size for reading file is 4096 bytes since it allign perfectly
+    // with OS page size
     var file_buffer: [0]u8 = undefined;
     var reader = file.reader(Io, &file_buffer);
 
@@ -214,4 +216,25 @@ test "reading from file" {
     defer allocator.free(content);
 
     std.debug.print("content: {s} <<- EOF ->>\nfile size: {d} KB\n", .{ content, stat.size / 1024 });
+}
+
+test "read until newline" {
+    const Io = std.testing.io;
+
+    var stdout_buf: [1024]u8 = undefined;
+    var writer = std.Io.File.stdout().writer(Io, &stdout_buf);
+    const stdout: *std.Io.Writer = &writer.interface;
+
+    var stdin_buf: [1024]u8 = undefined;
+    var reader = std.Io.File.stdout().reader(Io, &stdin_buf);
+    const stdin: *std.Io.Reader = &reader.interface;
+
+    try stdout.writeAll("Enter your name\n");
+    try stdout.flush();
+
+    const bare_line = try stdin.takeDelimiter('\n') orelse unreachable;
+    const line = std.mem.trim(u8, bare_line, "\n\r");
+
+    try stdout.print("Yourname is: \"{s}\"\n", .{line});
+    try stdout.flush();
 }
