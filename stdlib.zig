@@ -184,3 +184,34 @@ test "make dir" {
 
     try std.testing.expect(file_count == 3);
 }
+
+// readers and writers
+
+test "reader writer" {
+    const allocator = std.testing.allocator;
+    var list: std.ArrayList(u8) = .empty;
+    defer list.deinit(allocator);
+
+    try list.print(allocator, "Hello {s}!\n", .{"World"});
+
+    try std.testing.expectEqualStrings("Hello World!\n", list.items);
+}
+
+test "reading from file" {
+    const Io = std.testing.io;
+    const allocator = std.testing.allocator;
+    const file = try std.Io.Dir.cwd().openFile(Io, "testFile.txt", .{ .mode = .read_only });
+    defer file.close(Io);
+
+    const stat = try file.stat(Io);
+
+    // i read the whole file so use unbuffered rader;
+    var file_buffer: [0]u8 = undefined;
+    var reader = file.reader(Io, &file_buffer);
+
+    const content = try reader.interface.readAlloc(allocator, stat.size);
+
+    defer allocator.free(content);
+
+    std.debug.print("content: {s} <<- EOF ->>\nfile size: {d} KB\n", .{ content, stat.size / 1024 });
+}
