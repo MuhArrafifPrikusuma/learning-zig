@@ -226,7 +226,7 @@ test "read until newline" {
     const stdout: *std.Io.Writer = &writer.interface;
 
     var stdin_buf: [1024]u8 = undefined;
-    var reader = std.Io.File.stdout().reader(Io, &stdin_buf);
+    var reader = std.Io.File.stdin().reader(Io, &stdin_buf);
     const stdin: *std.Io.Reader = &reader.interface;
 
     try stdout.writeAll("Enter your name\n");
@@ -238,3 +238,31 @@ test "read until newline" {
     try stdout.print("Yourname is: \"{s}\"\n", .{line});
     try stdout.flush();
 }
+
+// formatting
+
+test "fmt" {
+    const allocator = std.testing.allocator;
+    const string = try std.fmt.allocPrint(allocator, "{d} + {d} = {d}", .{ 9, 10, 19 });
+    defer allocator.free(string);
+
+    try std.testing.expect(std.mem.eql(u8, string, "9 + 10 = 19"));
+}
+
+test "print" {
+    const allocator = std.testing.allocator;
+
+    var Lists: std.ArrayList(u8) = .empty;
+    defer Lists.deinit(allocator);
+    try Lists.print(
+        allocator,
+        "{} + {} = {}",
+        .{ 9, 10, 19 },
+    );
+
+    try std.testing.expect(std.mem.eql(u8, Lists.items, "9 + 10 = 19"));
+}
+
+// NOTE: std.debug.print prints to stderr and it's protected with mutex by default
+
+test "hello world" {}
