@@ -272,13 +272,13 @@ const Person = struct {
     birth_year: u16,
     death_year: ?u16,
 
-    pub fn format(self: Person, writer: *std.Io.Writer) std.Io.Writer.Error!void {
+    pub fn format(self: Person, writer: *std.Io.Writer) !void {
         try writer.print("{s} ({}-", .{ self.name, self.birth_year });
 
         if (self.death_year) |year| {
             try writer.print("{}", .{year});
         }
-        try writer.writeAll(")\n");
+        try writer.writeAll(")\r\n");
     }
 };
 
@@ -290,8 +290,8 @@ test "custom format" {
     };
 
     // automatically format it
-    std.debug.print("{f}\n", .{john});
-    try std.testing.expectFmt("John Carmack (1970-)\n", "{f}", .{john});
+    std.debug.print("{f}", .{john});
+    try std.testing.expectFmt("John Carmack (1970-)\r\n", "{f}", .{john});
 
     const dennis: Person = .{
         .name = "Dennis Ritchie",
@@ -299,6 +299,57 @@ test "custom format" {
         .death_year = 2011,
     };
 
-    std.debug.print("{f}\n", .{dennis});
-    try std.testing.expectFmt("Dennis Ritchie (1941-2011)\n", "{f}", .{dennis});
+    std.debug.print("{f}", .{dennis});
+    try std.testing.expectFmt("Dennis Ritchie (1941-2011)\r\n", "{f}", .{dennis});
+}
+
+// JSON
+const Place = struct { lat: f64, long: f64 };
+test "json parsing" {
+    const allocator = std.testing.allocator;
+    // very cool built in parser for json so you don't have to make it from scratch
+    // althought i want to do it
+    const parsed = try std.json.parseFromSlice(Place, allocator,
+        \\{ "lat": 40.232332, "long": -74.232121 } 
+    , .{});
+    defer parsed.deinit();
+
+    const place = parsed.value;
+
+    try std.testing.expect(place.lat == 40.232332);
+    try std.testing.expect(place.long == -74.232121);
+}
+
+test "json stringify" {
+    const ttPlace: Place = .{
+        .lat = 51.12312,
+        .long = -21.2132,
+    };
+
+    const allocator = std.testing.allocator;
+    var string = std.Io.Writer.Allocating.init(allocator);
+    defer string.deinit();
+
+    try string.writer.print("{f}", .{std.json.fmt(ttPlace, .{})});
+
+    try std.testing.expectEqualStrings(
+        \\{"lat":51.12312,"long":-21.2132}
+    ,
+        string.written(),
+    );
+}
+
+test "json parsing with strings" {
+    const allocator = std.testing.allocator;
+    const User = struct { name: []u8, age: u8 };
+
+    const parsed = try std.json.parseFromSlice(User, allocator,
+        \\{"name":"idk","age":18}
+    , .{});
+    defer parsed.deinit();
+
+    const user = parsed.value;
+
+    try std.testing.expectEqualStrings("idk", user.name);
+    try std.testing.expect(user.age == 18);
 }
