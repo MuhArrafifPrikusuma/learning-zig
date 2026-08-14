@@ -265,4 +265,40 @@ test "print" {
 
 // NOTE: std.debug.print prints to stderr and it's protected with mutex by default
 
-test "hello world" {}
+// custom formatting
+
+const Person = struct {
+    name: []const u8,
+    birth_year: u16,
+    death_year: ?u16,
+
+    pub fn format(self: Person, writer: *std.Io.Writer) std.Io.Writer.Error!void {
+        try writer.print("{s} ({}-", .{ self.name, self.birth_year });
+
+        if (self.death_year) |year| {
+            try writer.print("{}", .{year});
+        }
+        try writer.writeAll(")\n");
+    }
+};
+
+test "custom format" {
+    const john: Person = .{
+        .name = "John Carmack",
+        .birth_year = 1970,
+        .death_year = null,
+    };
+
+    // automatically format it
+    std.debug.print("{f}\n", .{john});
+    try std.testing.expectFmt("John Carmack (1970-)\n", "{f}", .{john});
+
+    const dennis: Person = .{
+        .name = "Dennis Ritchie",
+        .birth_year = 1941,
+        .death_year = 2011,
+    };
+
+    std.debug.print("{f}\n", .{dennis});
+    try std.testing.expectFmt("Dennis Ritchie (1941-2011)\n", "{f}", .{dennis});
+}
