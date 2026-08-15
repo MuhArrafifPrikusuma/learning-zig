@@ -387,3 +387,37 @@ test "crypto secure rng" {
     std.debug.print("{d}\n", .{rand.intRangeAtMost(u8, 0, 100)});
     std.debug.print("{d}\n", .{rand.uintLessThan(u64, 222_222_222_222)});
 }
+
+// Threads
+
+// this run in worker thread
+fn ticker(step: u8) void {
+    const io = std.testing.io;
+    while (true) {
+        std.Io.sleep(io, std.Io.Duration.fromSeconds(1), std.Io.Clock.real) catch unreachable;
+        tick += @as(isize, step);
+        std.debug.print("worker thread counter: {d}\n", .{tick});
+        if (tick == 10) break;
+    }
+}
+var tick: isize = 0;
+
+test "threading" {
+    const io = std.testing.io;
+    var thread = try std.Thread.spawn(.{}, ticker, .{@as(u8, 1)});
+
+    std.debug.print("tick: {d}\n", .{tick});
+    try std.testing.expect(tick == 0);
+    // this time to perfectly take tick when it has the value of 2
+    // but in real scenario you wouldn't want to wait like this since it's so freaking slow
+    // std.Io.sleep(io, std.Io.Duration.fromSeconds(2), std.Io.Clock.real) catch unreachable;
+
+    var i: u8 = 0;
+    while (i < 100) : (i += 1) {
+        std.Io.sleep(io, std.Io.Duration.fromMilliseconds(100), std.Io.Clock.real) catch unreachable;
+        std.debug.print("main thread counter: {d}\n", .{i});
+    }
+    thread.join();
+    std.debug.print("tick: {d}\n", .{tick});
+    try std.testing.expect(tick == 10);
+}
