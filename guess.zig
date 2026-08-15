@@ -7,15 +7,14 @@ pub fn main(init: std.process.Init) !void {
     var handle: HandleIo(1024) = undefined;
     handle.init(&io);
 
-    const random_number: u8 = getRandom(&io) catch |err| {
+    const random_number: u8 = getRandom(&io, 0, 100) catch |err| {
         std.debug.print("{any}\n", .{err});
     };
-    std.debug.print("{d}\n", .{random_number});
 
     try handle.stdout.print("<<- Find a random number ->>\n", .{});
-    try handle.stdout.flush();
 
     var clue_counter: u8 = 0;
+
     while (true) {
         try handle.stdout.print("Guess the number: ", .{});
         try handle.stdout.flush();
@@ -26,28 +25,34 @@ pub fn main(init: std.process.Init) !void {
 
         const correct = checkAnswer(u8, input, random_number) catch |err| switch (err) {
             error.InvalidCharacter => {
-                std.debug.print("nope that's not a number\n", .{});
+                try handle.stdout.print("nope that's not a number\n", .{});
+                try handle.stdout.flush();
                 continue;
             },
 
             error.Overflow => {
-                std.debug.print("number too big!\n", .{});
+                try handle.stdout.print("number too big!\n", .{});
+                try handle.stdout.flush();
                 continue;
             },
 
             error.WrongAnswer => {
-                std.debug.print("wrong answer\n", .{});
-                clue_counter += try guess.clues(clue_counter, &io);
+                try handle.stdout.print("wrong answer!\n", .{});
+                try handle.stdout.flush();
+                clue_counter += try guess.clues(clue_counter, &io, &random_number);
                 continue;
             },
         };
 
-        if (correct) {}
-        std.debug.print("{any}\n", .{correct});
+        if (correct) {
+            try handle.stdout.print("{d} IS THE CORRECT ANSWER!, YOU WIN!\n", .{random_number});
+            try handle.stdout.flush();
+            break;
+        }
     }
 }
 
-fn getRandom(io: *const std.Io) !u8 {
+fn getRandom(io: *const std.Io, min: u8, max: u8) !u8 {
     var buf: [8]u8 = undefined;
     io.*.random(&buf);
 
@@ -56,7 +61,7 @@ fn getRandom(io: *const std.Io) !u8 {
 
     var getRand = rand.random();
 
-    return getRand.intRangeLessThan(u8, 0, 101);
+    return getRand.intRangeLessThan(u8, min, max + 1);
 }
 
 fn checkAnswer(T: type, input: []const u8, answer: T) error{ InvalidCharacter, Overflow, WrongAnswer }!bool {
@@ -94,11 +99,17 @@ fn HandleIo(comptime bufSize: u64) type {
     };
 }
 
-fn clues(clue_count: u8, io: *const std.Io) !u8 {
+fn clues(clue_count: u8, io: *const std.Io, answer: *const u8) !u8 {
     var count: u8 = 0;
 
     var handle: HandleIo(1024) = undefined;
     handle.init(io);
+
+    if (clue_count >= 7) {
+        try handle.stdout.print("oops ran out of clues\n", .{});
+        try handle.stdout.flush();
+        return 0;
+    }
 
     while (true) {
         switch (count) {
@@ -120,7 +131,8 @@ fn clues(clue_count: u8, io: *const std.Io) !u8 {
 
         switch (input_int) {
             1 => {
-                giveClues(clue_count, io);
+                guess.giveClues(clue_count, io, answer) catch unreachable;
+                return 1;
             },
             2 => return 0,
 
@@ -133,7 +145,50 @@ fn clues(clue_count: u8, io: *const std.Io) !u8 {
     return 1;
 }
 
-fn giveClues(clue_count: u8, io: *const std.Io) void {
+fn giveClues(clue_count: u8, io: *const std.Io, answer: *const u8) !void {
     var handle: HandleIo(1024) = undefined;
-    handle.init(&io);
+    handle.init(io);
+
+    const which = guess.getRandom(io, clue_count, 10) catch |err| std.debug.print("{any}\n", .{err});
+
+    switch (which) {
+        0...4 => {
+            if (answer.* % @as(u8, 2) == 0) {
+                try handle.stdout.print("clue: the answer is an even number\n", .{});
+            } else {
+                try handle.stdout.print("clue: the answer is an odd number\n", .{});
+            }
+            try handle.stdout.flush();
+        },
+        5...7 => {
+            var n: u8 = 0;
+            var val: u8 = answer.*;
+
+            n = guess.getRandom(io, 0, answer.*) catch unreachable;
+            val -= n;
+            try handle.stdout.print("the number is {d} <= ? <=", .{val});
+
+            n = guess.getRandom(io, answer.* - val, 100 - val) catch unreachable;
+            val += n;
+            try handle.stdout.print(" {d}\n", .{val});
+        },
+        8...10 => {
+            var n: u8 = 0;
+            var val: u8 = answer.*;
+
+            n = guess.getRandom(io, 0, 5) catch unreachable;
+            if (answer.* - n < 0) n = 0;
+
+            val = answer.* - n;
+            try handle.stdout.print("number is {d} <= ? <=", .{val});
+
+            n = guess.getRandom(io, 0, 5) catch unreachable;
+            if (answer.* + n > 100) n = 0;
+
+            val = answer.* + n;
+            try handle.stdout.print(" {d}\n", .{val});
+        },
+        else => unreachable,
+    }
+    try handle.stdout.flush();
 }
