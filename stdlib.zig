@@ -353,3 +353,37 @@ test "json parsing with strings" {
     try std.testing.expectEqualStrings("idk", user.name);
     try std.testing.expect(user.age == 18);
 }
+// random number
+
+test "random numbers" {
+    const io = std.testing.io;
+    var prng: std.Random.Xoroshiro128 = .init(blk: {
+        var buf: [8]u8 = undefined;
+        io.random(&buf);
+        const seed = std.mem.readInt(u64, &buf, .big);
+
+        break :blk seed;
+    });
+
+    const rand = prng.random();
+
+    const a = rand.float(f32);
+    const b = rand.boolean();
+    const c = rand.uintAtMost(u64, 2000000000000);
+    const d = rand.intRangeAtMost(i64, -50_000_000, 100_000_000);
+
+    std.debug.print("float prng: {d}\nbool: {any}\nuint: {d}\nintRange: {d}\n", .{ a, b, c, d });
+}
+
+test "crypto secure rng" {
+    const io = std.testing.io;
+    var buf: [32]u8 = undefined;
+    try std.Io.randomSecure(io, &buf);
+
+    var crypt = std.Random.DefaultCsprng.init(buf);
+
+    const rand = crypt.random();
+    std.debug.print("{d}\n", .{rand.float(f64)});
+    std.debug.print("{d}\n", .{rand.intRangeAtMost(u8, 0, 100)});
+    std.debug.print("{d}\n", .{rand.uintLessThan(u64, 222_222_222_222)});
+}
