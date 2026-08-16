@@ -455,3 +455,58 @@ test "hashing" {
     try std.testing.expect(map.get("hello").?.x == 21);
     try std.testing.expect(map.get("hello").?.y == 13);
 }
+
+test "fetchput" {
+    const allocator = std.testing.allocator;
+    var map = std.AutoHashMap(u8, f32).init(allocator);
+    defer map.deinit();
+
+    try map.put(9, 32.1);
+    // put a new value to key and return the old map
+    const old = try map.fetchPut(9, 20);
+
+    try std.testing.expect(old.?.value == 32.1);
+    try std.testing.expect(map.get(9).? == 20);
+}
+
+test "StringHashMap" {
+    const allocator = std.testing.allocator;
+    var map = std.StringHashMap(enum { cool, uncool }).init(allocator);
+    defer map.deinit();
+
+    try map.put("Fabrice Bellard", .cool);
+    try map.put("Irfan", .uncool);
+
+    try std.testing.expect(map.get("Fabrice Bellard").? == .cool);
+    try std.testing.expect(map.get("Irfan").? == .uncool);
+}
+
+// NOTE: also try std.HashMap for more control
+
+test "ArrayList stack" {
+    const allocator = std.testing.allocator;
+
+    const string = "(()())";
+    var stack: std.ArrayList(usize) = .empty;
+    defer stack.deinit(allocator);
+
+    const Pair = struct { open: usize, close: usize };
+    var pairs: std.ArrayList(Pair) = .empty;
+    defer pairs.deinit(allocator);
+
+    for (string, 0..) |char, i| {
+        if (char == '(') try stack.append(allocator, i);
+        if (char == ')') try pairs.append(allocator, .{
+            .open = stack.pop() orelse @panic("mismatch brackets"),
+            .close = i,
+        });
+    }
+
+    const expected_pairs: []const Pair = &.{
+        .{ .open = 1, .close = 2 },
+        .{ .open = 3, .close = 4 },
+        .{ .open = 0, .close = 5 },
+    };
+
+    try std.testing.expectEqualDeep(expected_pairs, pairs.items);
+}
