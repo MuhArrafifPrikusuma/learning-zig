@@ -394,9 +394,9 @@ test "crypto secure rng" {
 fn ticker(step: u8) void {
     const io = std.testing.io;
     while (true) {
-        std.Io.sleep(io, std.Io.Duration.fromSeconds(1), std.Io.Clock.real) catch unreachable;
+        std.Io.sleep(io, std.Io.Duration.fromMilliseconds(1), std.Io.Clock.real) catch unreachable;
         tick += @as(isize, step);
-        std.debug.print("worker thread counter: {d}\n", .{tick});
+        std.debug.print("\x1b[31mworker thread counter: {d}\x1b[0m\n", .{tick});
         if (tick == 10) break;
     }
 }
@@ -412,12 +412,46 @@ test "threading" {
     // but in real scenario you wouldn't want to wait like this since it's so freaking slow
     // std.Io.sleep(io, std.Io.Duration.fromSeconds(2), std.Io.Clock.real) catch unreachable;
 
-    var i: u8 = 0;
-    while (i < 100) : (i += 1) {
-        std.Io.sleep(io, std.Io.Duration.fromMilliseconds(100), std.Io.Clock.real) catch unreachable;
+    var i: u32 = 0;
+    while (i < 10) : (i += 1) {
+        std.Io.sleep(io, std.Io.Duration.fromMilliseconds(1), std.Io.Clock.real) catch unreachable;
         std.debug.print("main thread counter: {d}\n", .{i});
     }
+    // use join instead if you want to preciesly wait for the thread to finish it's job
+    // WARNING: This is blocking!
     thread.join();
     std.debug.print("tick: {d}\n", .{tick});
     try std.testing.expect(tick == 10);
+}
+
+// Hashmap
+
+test "hashing" {
+    const allocator = std.testing.allocator;
+    const Point = struct { x: i32, y: i32 };
+
+    var map = std.StringHashMap(Point).init(allocator);
+    defer map.deinit();
+
+    try map.put("hello", .{ .x = 21, .y = 13 });
+    try map.put("lol", .{ .x = 11, .y = 12 });
+    try map.put("world", .{ .x = 29, .y = 23 });
+    try map.put("doom", .{ .x = 31, .y = 53 });
+    try map.put("foo", .{ .x = 33, .y = 11 });
+    try map.put("bar", .{ .x = 33, .y = 14 });
+
+    try std.testing.expect(map.count() == 6);
+    var sum = Point{ .x = 0, .y = 0 };
+    var iterator = map.iterator();
+
+    while (iterator.next()) |entry| {
+        sum.x += entry.value_ptr.x;
+        sum.y += entry.value_ptr.y;
+    }
+    std.debug.print("x: {d}, y: {d}\n", .{ sum.x, sum.y });
+
+    try std.testing.expect(sum.x == 158);
+    try std.testing.expect(sum.y == 126);
+    try std.testing.expect(map.get("hello").?.x == 21);
+    try std.testing.expect(map.get("hello").?.y == 13);
 }
