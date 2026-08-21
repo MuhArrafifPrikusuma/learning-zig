@@ -510,3 +510,115 @@ test "ArrayList stack" {
 
     try std.testing.expectEqualDeep(expected_pairs, pairs.items);
 }
+
+// custom iterator
+
+const ContainsIterator = struct {
+    strings: []const []const u8,
+    needle: []const u8,
+    index: usize = 0,
+
+    fn next(self: *ContainsIterator) ?[]const u8 {
+        const index = self.index;
+        for (self.strings[index..]) |string| {
+            self.index += 1;
+            if (std.mem.indexOf(u8, string, self.needle)) |_| return string;
+        }
+        return null;
+    }
+
+    fn peek(self: *ContainsIterator) ?[]const u8 {
+        const index = self.index;
+        for (self.strings[index..]) |string| {
+            if (std.mem.indexOf(u8, string, self.needle)) |_| return string;
+        }
+        return null;
+    }
+};
+
+test "custom iterator" {
+    var iter = ContainsIterator{
+        .strings = &[_][]const u8{ "one", "two", "three" },
+        .needle = "e",
+    };
+
+    try std.testing.expect(std.mem.eql(u8, iter.next().?, "one"));
+    try std.testing.expect(std.mem.eql(u8, iter.peek().?, "three"));
+    try std.testing.expect(std.mem.eql(u8, iter.next().?, "three"));
+    _ = iter.next();
+    try std.testing.expect(iter.peek() == null);
+}
+
+// format specifiers
+
+test "hex" {
+    var buf: [10]u8 = undefined;
+
+    try std.testing.expectEqualStrings(
+        "FFFFFFFE",
+        try std.fmt.bufPrint(&buf, "{X}", .{4294967294}),
+    );
+
+    try std.testing.expectEqualStrings(
+        "fffffffe",
+        try std.fmt.bufPrint(&buf, "{x}", .{4294967294}),
+    );
+
+    try std.testing.expectEqualStrings(
+        "0xAAAAAAAA",
+        try std.fmt.bufPrint(&buf, "0x{X}", .{2863311530}),
+    );
+
+    try std.testing.expectEqualStrings(
+        "0x5a696721",
+        try std.fmt.bufPrint(&buf, "0x{x}", .{"Zig!"}),
+    );
+}
+
+test "decimal float" {
+    var b: [4]u8 = undefined;
+    try std.testing.expectEqualStrings(
+        "16.5",
+        try std.fmt.bufPrint(&b, "{d}", .{16.5}),
+    );
+}
+
+test "ascii fmt" {
+    var b: [1]u8 = undefined;
+    try std.testing.expectEqualStrings(
+        "B",
+        try std.fmt.bufPrint(&b, "{c}", .{66}),
+    );
+}
+
+// advance formatting
+
+test "position" {
+    var b: [3]u8 = undefined;
+    try std.testing.expectEqualStrings(
+        "aba",
+        try std.fmt.bufPrint(&b, "{0s}{1s}{0s}", .{ "a", "b" }),
+    );
+    // those numbers define the argument position
+}
+
+test "fill, alignment, width" {
+    var b: [6]u8 = undefined;
+    try std.testing.expectEqualStrings(
+        "hi!   ",
+        try std.fmt.bufPrint(&b, "{s: <6}", .{"hi!"}),
+    );
+    try std.testing.expectEqualStrings(
+        "_hi!__",
+        try std.fmt.bufPrint(&b, "{s:_^6}", .{"hi!"}),
+    );
+
+    try std.testing.expectEqualStrings(
+        "!hi!",
+        try std.fmt.bufPrint(&b, "{s:!>4}", .{"hi!"}),
+    );
+    try std.testing.expectEqualStrings(
+        "16.25",
+        try std.fmt.bufPrint(&b, "{d:.2}", .{16.25323543241}),
+    );
+}
